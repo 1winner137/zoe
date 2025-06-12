@@ -1,115 +1,90 @@
-<h1 align="center">Zoe</h1>
+# Zoe
 
-[![Vcpkg package](https://img.shields.io/badge/Vcpkg-package-blueviolet)](https://github.com/microsoft/vcpkg/tree/master/ports/zoe)
-[![badge](https://img.shields.io/badge/license-MIT-blue)](https://github.com/winsoft666/zoe/blob/master/LICENSE)
+A high-performance C++ file download library.
 
-English | [ 简体中文](README_ch.md)
-
-A C++ file download library.
+[English](README.md) | [简体中文](README_ch.md)
 
 ## Features
 
-- Multi-protocol, such as HTTP(s), FTP(s)...
+- Multi-protocol support (HTTP/HTTPS, FTP/FTPS)
+- Multi-threaded segmented downloads with resume capability
+- Support for large files (up to PB level)
+- Configurable download speed limits
+- Progress monitoring and real-time speed tracking
+- Hash verification (MD5, SHA1, SHA256)
+- SSL/TLS certificate verification
+- Proxy support
+- Cross-platform (Windows, Linux, macOS)
 
-- Multi-threaded Segmented downloads and breakpoint transmission.
-  
-- Limit download speed.
+## Building and Installation
 
-- Disk cache.
+Zoe's only dependency is [curl](https://github.com/curl/curl).
 
-- Support large file (PB level).
-
-- Compatible with server leeching detection(or limit).
-
-## Compile and Install
-
-Zoe only depends on [curl](https://github.com/curl/curl). After installing curl, use CMake to compile and install Zoe.
-
-In addition, the `Zoe` library has been included in Microsoft's [vcpkg](https://github.com/microsoft/vcpkg/tree/master/ports/zoe), which can be quickly installed directly using the following command:
+### Windows
 
 ```bash
-vcpkg install zoe
+mkdir build
+cd build
+cmake ..
+cmake --build . --config Release
 ```
 
-> If running the test case fails, check if the download link in the http_test_datas variable (test_data.h) is valid.
+### Linux/macOS
 
-## Getting Started
+```bash
+mkdir build
+cd build
+cmake ..
+make
+```
 
-The following example uses Zoe's default configuration parameters to demonstrate how to quickly use Zoe to download file:
+## Usage
+
+### Basic Usage
 
 ```cpp
-#include <iostream>
-#include "zoe.h"
+#include <zoe/zoe.h>
 
-int main(int argc, char** argv) {
-  using namespace zoe;
-
-  Zoe::GlobalInit();
-
-  Zoe z;
-  
-  std::shared_future<Result> r = z.start(u8"http://xxx.xxx.com/test.exe", u8"D:\\test.exe");
-
-  Result result = r.get();
-
-  Zoe::GlobalUnInit();
-
-  return 0;
+int main() {
+    Zoe z;
+    
+    // Configure download settings
+    z.setThreadNum(4);  // Use 4 threads
+    z.setMaxDownloadSpeed(1024 * 1024);  // Limit speed to 1MB/s
+    z.setMinDownloadSpeed(512 * 1024, 5000);  // Require at least 512KB/s for 5 seconds
+    
+    // Start download
+    auto future = z.start(
+        "https://example.com/file.zip",
+        "file.zip",
+        [](ZoeResult result) {
+            if (result == ZoeResult::SUCCESSED) {
+                std::cout << "Download completed successfully" << std::endl;
+            } else {
+                std::cout << "Download failed with error code: " << (int)result << std::endl;
+            }
+        },
+        [](int64_t total, int64_t downloaded) {
+            if (total > 0) {
+                int progress = (int)((double)downloaded * 100.0 / total);
+                std::cout << "Progress: " << progress << "%" << std::endl;
+            }
+        },
+        [](int64_t bytes_per_second) {
+            std::cout << "Current speed: " << bytes_per_second << " bytes/second" << std::endl;
+        }
+    );
+    
+    // Wait for download to complete
+    future.wait();
+    
+    return 0;
 }
 ```
 
-The following example is a bit more complex and sets some configuration parameters and callback functions:
+### Command-line Tool
 
-```cpp
-#include <iostream>
-#include "zoe.h"
-
-int main(int argc, char** argv) {
-  using namespace zoe;
-
-  Zoe::GlobalInit();
-
-  Zoe z;
-
-  z.setThreadNum(10);                     // Optional
-  z.setTmpFileExpiredTime(3600);          // Optional
-  z.setDiskCacheSize(20 * (2 << 19));     // Optional
-  z.setMaxDownloadSpeed(50 * (2 << 19));  // Optional
-  z.setHashVerifyPolicy(ALWAYS, MD5, "6fe294c3ef4765468af4950d44c65525"); // Optional, support MD5, CRC32, SHA256
-  // There are more options available, please check zoe.h
-  z.setVerboseOutput([](const utf8string& verbose) { // Optional
-    printf("%s\n", verbose.c_str());
-  });
-  z.setHttpHeaders({  // Optional
-    {u8"Origin", u8"http://xxx.xxx.com"},
-    {u8"User-Agent", u8"Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 5.1)"}
-   });
-  
-  std::shared_future<Result> r = z.start(
-      u8"http://xxx.xxx.com/test.exe", u8"D:\\test.exe",
-      [](Result result) {  // Optional
-        // result callback
-      },
-      [](int64_t total, int64_t downloaded) {  // Optional
-        // progress callback
-      },
-      [](int64_t byte_per_secs) {  // Optional
-        // real-time speed callback
-      });
-
-  r.wait();
-
-  Zoe::GlobalUnInit();
-
-  return 0;
-}
-```
-
-## Command-line tool
-
-`zoe_tool` is command-line tool based on `zoe` library. 
-
-Usage:
+Zoe also provides a command-line tool for downloading files:
 
 ```bash
 zoe_tool URL TargetFilePath [ThreadNum] [DiskCacheMb] [MD5] [TmpExpiredSeconds] [MaxSpeed]
@@ -123,7 +98,10 @@ zoe_tool URL TargetFilePath [ThreadNum] [DiskCacheMb] [MD5] [TmpExpiredSeconds] 
 - TmpExpiredSeconds: seconds, optional, the temporary file will expired after these senconds.
 - MaxSpeed: max download speed(byte/s).
 
-## Sponsor
-Thank you for using this project. It would be a great pleasure for me if this project can be of help to you.
+## Support
 
-**You can go to my Github [homepage](https://github.com/winsoft666) to make a donation.**
+If you find this project helpful, please consider supporting it through my GitHub homepage.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

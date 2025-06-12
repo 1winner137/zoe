@@ -1,116 +1,105 @@
-<h1 align="center">Zoe</h1>
+# Zoe
 
-[![Vcpkg package](https://img.shields.io/badge/Vcpkg-package-blueviolet)](https://github.com/microsoft/vcpkg/tree/master/ports/zoe)
-[![badge](https://img.shields.io/badge/license-MIT-blue)](https://github.com/winsoft666/zoe/blob/master/LICENSE)
+一个高性能的 C++ 文件下载库。
 
-简体中文 | [ English](README.md)
+[English](README.md) | [简体中文](README_ch.md)
 
 ## 特性
 
-- 多协议支持，如 HTTP(s), FTP(s)...
-  
-- 多线程分片下载和断点续传
-  
-- 下载限速
+- 多协议支持（HTTP/HTTPS、FTP/FTPS）
+- 多线程分片下载，支持断点续传
+- 支持超大文件（可达 PB 级别）
+- 可配置的下载速度限制
+- 进度监控和实时速度跟踪
+- 哈希校验（MD5、SHA1、SHA256）
+- SSL/TLS 证书验证
+- 代理支持
+- 跨平台（Windows、Linux、macOS）
 
-- 磁盘缓存
+## 构建与安装
 
-- 支持 PB 级别大文件下载
+Zoe 的唯一依赖是 [curl](https://github.com/curl/curl)。
 
-- 兼容服务器对加速下载行为的限制
-
-## 编译与安装
-
-Zoe 仅依赖 [curl](https://github.com/curl/curl)，在安装 curl 之后，使用 CMake 编译安装 Zoe。
-
-另外，`Zoe` 库已经收录到微软的 [vcpkg](https://github.com/microsoft/vcpkg/tree/master/ports/zoe)，可以直接使用下面命令快速安装：
+### Windows
 
 ```bash
-vcpkg install zoe
+mkdir build
+cd build
+cmake ..
+cmake --build . --config Release
 ```
 
-> 如果运行测试用例失败，请检查 http_test_datas 变量 (test_data.h) 中的下载链接是否有效。
+### Linux/macOS
 
-## 快速开始
+```bash
+mkdir build
+cd build
+cmake ..
+make
+```
 
-下面示例使用 Zoe 的默认配置参数，演示了如何快速地使用 Zoe 进行文件下载：
+## 使用方法
+
+### 基本用法
 
 ```cpp
-#include <iostream>
-#include "zoe.h"
+#include <zoe/zoe.h>
 
-int main(int argc, char** argv) {
-  using namespace zoe;
+int main() {
+    Zoe z;
+    
+    // 配置下载设置
+    z.setThreadNum(3);  // 设置并发线程数
+    z.setNetworkConnectionTimeout(5000);  // 设置连接超时时间为5秒
+    z.setRetryTimesOfFetchFileInfo(3);  // 设置获取文件信息的重试次数
+    z.setFetchFileInfoHeadMethodEnabled(true);  // 启用HEAD方法获取文件信息
+    z.setExpiredTimeOfTmpFile(3600);  // 设置临时文件过期时间为1小时
+    z.setMaxDownloadSpeed(1024 * 1024);  // 设置最大下载速度为1MB/s
+    z.setMinDownloadSpeed(1024 * 100, 10);  // 设置最小下载速度为100KB/s，持续10秒
+    z.setDiskCacheSize(10 * 1024 * 1024);  // 设置磁盘缓存大小为10MB
+    z.setRedirectedUrlCheckEnabled(true);  // 启用重定向URL检查
+    z.setContentMd5Enabled(true);  // 启用Content-MD5验证
+    z.setSlicePolicy(SlicePolicy::FixedNum, 10);  // 设置分片策略为固定分片数
+    z.setHashVerifyPolicy(HashVerifyPolicy::AlwaysVerify, HashType::MD5, "md5_value");  // 设置哈希验证
+    z.setProxy("http://proxy.example.com:8080");  // 设置代理
+    z.setVerifyCAEnabled(true, "ca_path");  // 启用CA验证
+    z.setVerifyHostEnabled(true);  // 启用主机验证
+    z.setUncompletedSliceSavePolicy(UncompletedSliceSavePolicy::ALWAYS_SAVE);  // 设置未完成分片保存策略
+    z.setVerboseOutput([](const utf8string& verbose) {  // 设置详细输出
+      printf("%s", verbose.c_str());
+    });
 
-  Zoe::GlobalInit();
+    // 开始下载
+    auto future = z.start(
+        "http://example.com/file.zip",
+        "file.zip",
+        [](ZoeResult result) {  // 结果回调
+          printf("Result: %d\n", (int)result);
+        },
+        [](int64_t total, int64_t downloaded) {  // 进度回调
+          if (total > 0)
+            printf("%3d%%\b\b\b\b", (int)((double)downloaded * 100.f / (double)total));
+        },
+        [](int64_t bytes_per_second) {  // 速度回调
+          printf("%.3f MB/s\b\b\b\b\b\b\b\b\b\b", (float)bytes_per_second / (1024.f * 1024.f));
+        });
 
-  Zoe z;
-  
-  std::shared_future<Result> r = z.start(u8"http://xxx.xxx.com/test.exe", u8"D:\\test.exe");
-
-  Result result = r.get();
-
-  Zoe::GlobalUnInit();
-
-  return 0;
+    // 等待下载完成
+    future.wait();
+    
+    return 0;
 }
 ```
 
-下面示例稍显复杂，设置了一些配置参数和回调函数：
+### 命令行工具
 
-```cpp
-#include <iostream>
-#include "zoe.h"
-
-int main(int argc, char** argv) {
-  using namespace zoe;
-
-  Zoe::GlobalInit();
-
-  Zoe z;
-
-  z.setThreadNum(10);                     // 可选的
-  z.setTmpFileExpiredTime(3600);          // 可选的
-  z.setDiskCacheSize(20 * (2 << 19));     // 可选的
-  z.setMaxDownloadSpeed(50 * (2 << 19));  // 可选的
-  z.setHashVerifyPolicy(ALWAYS, MD5, "6fe294c3ef4765468af4950d44c65525"); // 可选的, 支持 MD5, CRC32, SHA256
-  // 还支持其他更多的选择，请查看zoe.h
-  z.setVerboseOutput([](const utf8string& verbose) { // 可选的
-    printf("%s\n", verbose.c_str());
-  });
-  z.setHttpHeaders({  // 可选的
-    {u8"Origin", u8"http://xxx.xxx.com"},
-    {u8"User-Agent", u8"Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 5.1)"}
-   });
-  
-  std::shared_future<Result> r = z.start(
-      u8"http://xxx.xxx.com/test.exe", u8"D:\\test.exe",
-      [](Result result) {  // 可选的
-        // 结果回调
-      },
-      [](int64_t total, int64_t downloaded) {  // 可选的
-        // 进度回调
-      },
-      [](int64_t byte_per_secs) {  // 可选的
-        // 实时速率回调
-      });
-
-  r.wait();
-
-  Zoe::GlobalUnInit();
-
-  return 0;
-}
-```
-
-## 命令行工具
-`zoe_tool`是一个基于 `zoe` 库开发的命令行下载工具，用法如下：
+Zoe 还提供了一个命令行工具用于下载文件：
 
 ```bash
 zoe_tool URL TargetFilePath [ThreadNum] [DiskCacheMb] [MD5] [TmpExpiredSeconds] [MaxSpeed]
 ```
 
-参数解释：
+选项：
 - URL: 下载链接
 - TargetFilePath: 下载的目标文件保存路径
 - ThreadNum: 线程数量，可选，默认为1
@@ -119,8 +108,10 @@ zoe_tool URL TargetFilePath [ThreadNum] [DiskCacheMb] [MD5] [TmpExpiredSeconds] 
 - TmpExpiredSeconds: 秒数，可选，临时文件经过多少秒之后过期
 - MaxSpeed: 最高下载速度(byte/s)
 
-## 赞助
+## 支持
 
-感谢您能使用本项目，如果这个项目能对您产生帮助，对我而言也是一件非常开心的事情。
+如果您觉得这个项目有帮助，请考虑通过我的 GitHub 主页支持它。
 
-**可以前往我的 Github [主页](https://github.com/winsoft666) 进行赞助。**
+## 许可证
+
+本项目采用 MIT 许可证 - 详情请参阅 [LICENSE](LICENSE) 文件。

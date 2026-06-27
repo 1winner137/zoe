@@ -1,5 +1,11 @@
 # Zoe
 
+**⚠️ IMPORTANT: This project has shifted to [Latch](https://github.com/ProgInsight/Latch)** 🚀
+
+Latch is the evolution of Zoe - a more powerful, feature-rich, and actively maintained C++ file download library. We recommend all users migrate to Latch for continued updates and improvements.
+
+---
+
 A high-performance C++ file download library.
 
 [English](README.md) | [简体中文](README_ch.md)
@@ -22,6 +28,7 @@ A high-performance C++ file download library.
 Zoe's only dependency is [curl](https://github.com/curl/curl).
 
 ### vcpkg
+
 ```bash
 vcpkg install zoe
 ```
@@ -104,6 +111,21 @@ zoe_tool URL TargetFilePath [ThreadNum] [DiskCacheMb] [MD5] [TmpExpiredSeconds] 
 - TmpExpiredSeconds: seconds, optional, the temporary file will expired after these senconds.
 - MaxSpeed: max download speed(byte/s).
 
+## Migration to Latch
+
+We've shifted development to [Latch](https://github.com/ProgInsight/Latch), which offers:
+
+- **Async turbo I/O** for improved performance
+- **Better error handling** and recovery mechanisms
+- **Enhanced multi-threading** capabilities
+- **Active development** with regular updates
+- **Improved API** for easier integration
+- **More comprehensive test coverage**
+
+### Why Latch?
+
+Latch is a C++ multi-threaded file download library built on libcurl. It splits files into slices, downloads them in parallel, and picks up exactly where it left off if interrupted — with built-in speed control, hash verification, and async turbo I/O.
+
 ## Support
 
 If you find this project helpful, please consider supporting it through my GitHub homepage.
@@ -111,3 +133,7 @@ If you find this project helpful, please consider supporting it through my GitHu
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+**🚀 New users should start with [Latch](https://github.com/ProgInsight/Latch) for the best experience!**
